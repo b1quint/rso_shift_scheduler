@@ -163,3 +163,49 @@ class StaffAvailability(models.Model):
     
     def __str__(self):
         return f"{self.staff_member.full_name}: {self.availability_type} ({self.start_date} to {self.end_date})"
+
+
+class DailyAvailability(models.Model):
+    """
+    Tracks daily availability status for each staff member.
+    X = Unavailable, ? = Maybe available (prefer not to assign), A = Available
+    """
+    AVAILABILITY_CODE_CHOICES = [
+        ('X', 'Unavailable'),
+        ('?', 'Maybe Available (Prefer Not)'),
+        ('A', 'Available'),
+    ]
+    
+    staff_member = models.ForeignKey(
+        StaffMember,
+        on_delete=models.CASCADE,
+        related_name='daily_availability'
+    )
+    date = models.DateField()
+    availability_code = models.CharField(
+        max_length=1,
+        choices=AVAILABILITY_CODE_CHOICES,
+        default='A',
+        help_text="X=Unavailable, ?=Maybe Available, A=Available"
+    )
+    notes = models.CharField(max_length=200, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['date', 'staff_member']
+        unique_together = [['staff_member', 'date']]
+        verbose_name = 'Daily Availability'
+        verbose_name_plural = 'Daily Availabilities'
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['staff_member', 'date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.staff_member.full_name} - {self.date}: {self.availability_code}"
+    
+    @property
+    def availability_display(self):
+        return self.get_availability_code_display()

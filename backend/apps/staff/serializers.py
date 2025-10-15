@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Team, ShiftType, StaffMember, StaffAvailability
+from .models import Team, ShiftType, StaffMember, StaffAvailability, DailyAvailability
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -81,5 +81,20 @@ class StaffAvailabilitySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'staff_member', 'staff_member_name', 'start_date',
             'end_date', 'availability_type', 'reason', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class DailyAvailabilitySerializer(serializers.ModelSerializer):
+    """Serializer for DailyAvailability model"""
+    staff_member_name = serializers.CharField(source='staff_member.full_name', read_only=True)
+    availability_display = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = DailyAvailability
+        fields = [
+            'id', 'staff_member', 'staff_member_name', 'date',
+            'availability_code', 'availability_display', 'notes',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']

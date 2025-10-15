@@ -1,14 +1,16 @@
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Team, ShiftType, StaffMember, StaffAvailability
+from .models import Team, ShiftType, StaffMember, StaffAvailability, DailyAvailability
 from .serializers import (
     TeamSerializer,
     ShiftTypeSerializer,
     StaffMemberSerializer,
     StaffMemberCreateSerializer,
-    StaffAvailabilitySerializer
+    StaffAvailabilitySerializer,
+    DailyAvailabilitySerializer
 )
+from .pagination import LargeResultsSetPagination
 
 
 class TeamViewSet(viewsets.ReadOnlyModelViewSet):
@@ -61,3 +63,17 @@ class StaffAvailabilityViewSet(viewsets.ModelViewSet):
     filterset_fields = ['staff_member', 'availability_type', 'start_date']
     ordering_fields = ['start_date']
     ordering = ['start_date']
+
+
+class DailyAvailabilityViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for DailyAvailability CRUD operations
+    """
+    queryset = DailyAvailability.objects.select_related('staff_member__user').all()
+    serializer_class = DailyAvailabilitySerializer
+    pagination_class = LargeResultsSetPagination  # Allow large page sizes for calendar view
+    # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['staff_member', 'date', 'availability_code']
+    ordering_fields = ['date', 'staff_member']
+    ordering = ['date', 'staff_member']

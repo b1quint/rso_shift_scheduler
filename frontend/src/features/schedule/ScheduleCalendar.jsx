@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../services/api';
 import { staffService, shiftService } from '../../services';
 import './ScheduleCalendar.css';
@@ -6,11 +7,16 @@ import './ScheduleCalendar.css';
 const ScheduleCalendar = () => {
   const [staff, setStaff] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [dailyAvailability, setDailyAvailability] = useState([]);
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hoveredColumn, setHoveredColumn] = useState(null);
+  const [updatingCell, setUpdatingCell] = useState(null); // Track which cell is being updated
+  const [editingCell, setEditingCell] = useState(null); // Track which cell has dropdown open
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 }); // Dropdown position
+  const [editingCellData, setEditingCellData] = useState(null); // Store staffId and date for editing cell
   
   // Initialize with current week (today to 6 days later)
   const today = new Date();
@@ -113,6 +119,16 @@ const ScheduleCalendar = () => {
         });
         setShifts(shiftsResponse.data.results || shiftsResponse.data);
 
+        // Fetch daily availability for the date range (with large page size to get all records)
+        const availabilityResponse = await api.get('/staff/daily-availability/', {
+          params: {
+            date__gte: startDateStr,
+            date__lte: endDateStr,
+            page_size: 1000 // Get all records in one request
+          }
+        });
+        setDailyAvailability(availabilityResponse.data.results || availabilityResponse.data);
+
         setLoading(false);
       } catch (err) {
         console.error('Error fetching schedule data:', err);
@@ -133,6 +149,110 @@ const ScheduleCalendar = () => {
       return shift.assigned_staff === staffId && shiftDate === dateStr;
     });
   };
+
+  // Find availability for a specific staff member on a specific date
+  const getAvailabilityForStaffOnDate = (staffId, date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const found = dailyAvailability.find(avail => 
+      avail.staff_member === staffId && avail.date === dateStr
+    );
+    
+    return found;
+  };
+
+  // Get background color for availability code
+  const getAvailabilityColor = (code) => {
+    const colors = {
+      'X': '#fee2e2', // red-100
+      '?': '#fef3c7', // yellow-100
+      'A': '#dcfce7'  // green-100
+    };
+    return colors[code] || '#ffffff';
+  };
+
+  // Handle click on availability cell to show dropdown
+  const handleAvailabilityClick = (staffId, date, event) => {
+    event.stopPropagation();
+    const dateStr = date.toISOString().split('T')[0];
+    const cellKey = `${staffId}-${dateStr}`;
+    
+    // If clicking the same cell, close it
+    if (editingCell === cellKey) {
+      setEditingCell(null);
+      setEditingCellData(null);
+      return;
+    }
+    
+    // Calculate position for fixed dropdown
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY + 4, // 4px below the cell, accounting for scroll
+      left: rect.left + window.scrollX + (rect.width / 2) // Center horizontally, accounting for scroll
+    });
+    
+    setEditingCell(cellKey);
+    setEditingCellData({ staffId, date });
+  };
+
+  // Handle availability code selection from dropdown
+  const handleAvailabilityChange = async (staffId, date, newCode) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const cellKey = `${staffId}-${dateStr}`;
+    
+    setEditingCell(null); // Close dropdown
+    setEditingCellData(null);
+    setUpdatingCell(cellKey);
+    
+    const currentAvailability = getAvailabilityForStaffOnDate(staffId, date);
+
+    try {
+      if (currentAvailability) {
+        // Update existing availability
+        await api.patch(`/staff/daily-availability/${currentAvailability.id}/`, {
+          availability_code: newCode
+        });
+      } else {
+        // Create new availability record
+        await api.post('/staff/daily-availability/', {
+          staff_member: staffId,
+          date: dateStr,
+          availability_code: newCode
+        });
+      }
+
+      // Refresh availability data
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      const availabilityResponse = await api.get('/staff/daily-availability/', {
+        params: {
+          date__gte: startDateStr,
+          date__lte: endDateStr,
+          page_size: 1000 // Get all records in one request
+        }
+      });
+      setDailyAvailability(availabilityResponse.data.results || availabilityResponse.data);
+    } catch (err) {
+      console.error('Error updating availability:', err);
+      console.error('Error response data:', err.response?.data);
+      alert('Failed to update availability. Please try again.');
+    } finally {
+      setUpdatingCell(null);
+    }
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (editingCell && !event.target.closest('.availability-dropdown')) {
+        setEditingCell(null);
+        setEditingCellData(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [editingCell]);
 
   // Format date parts for column headers
   const getMonthName = (date) => {
@@ -226,7 +346,21 @@ const ScheduleCalendar = () => {
   return (
     <div className="schedule-calendar">
       <div className="schedule-header">
-        <h1>Staff Schedule</h1>
+        <div>
+          <h1>Staff Schedule</h1>
+          <div className="availability-legend">
+            <span className="legend-item">
+              <span className="legend-box" style={{ backgroundColor: '#dcfce7' }}>A</span> Available
+            </span>
+            <span className="legend-item">
+              <span className="legend-box" style={{ backgroundColor: '#fef3c7' }}>?</span> Maybe Available
+            </span>
+            <span className="legend-item">
+              <span className="legend-box" style={{ backgroundColor: '#fee2e2' }}>X</span> Unavailable
+            </span>
+            <span className="legend-note">💡 Click availability cells to select status</span>
+          </div>
+        </div>
         <div className="date-range-controls">
           <div className="date-inputs">
             <div className="date-input-group">
@@ -322,53 +456,87 @@ const ScheduleCalendar = () => {
           </thead>
           <tbody>
             {staff.map((staffMember) => (
-              <tr key={staffMember.id}>
-                <td className="staff-cell">
-                  <div className="staff-info">
-                    <div className="staff-name">{staffMember.full_name}</div>
-                    <div className="staff-role">
-                      {staffMember.team_code && (
-                        <span className="team-badge">{staffMember.team_code}</span>
-                      )}
-                      {staffMember.role_display}
+              <>
+                {/* Staff Info Row */}
+                <tr key={`${staffMember.id}-info`} className="staff-info-row">
+                  <td className="staff-cell" rowSpan="2">
+                    <div className="staff-info">
+                      <div className="staff-name">{staffMember.full_name}</div>
+                      <div className="staff-role">
+                        {staffMember.team_code && (
+                          <span className="team-badge">{staffMember.team_code}</span>
+                        )}
+                        {staffMember.role_display}
+                      </div>
                     </div>
-                  </div>
-                </td>
-                {displayDates.map((date, dateIndex) => {
-                  const dayShifts = getShiftsForStaffOnDate(staffMember.id, date);
-                  
-                  return (
-                    <td 
-                      key={dateIndex} 
-                      className={`shift-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${dayShifts.length > 0 ? 'has-shifts' : 'empty'}`}
-                      onMouseEnter={() => setHoveredColumn(dateIndex)}
-                      onMouseLeave={() => setHoveredColumn(null)}
-                    >
-                      {dayShifts.length > 0 ? (
-                        <div className="shifts-compact">
-                          {dayShifts.map((shift, shiftIndex) => {
-                            const shiftCode = shift.shift_code || '?';
-                            const shiftNumber = dayShifts.length > 1 ? shiftIndex + 1 : '';
-                            const shiftColor = shift.shift_color || '#6b7280';
-                            return (
-                              <span 
-                                key={shift.id} 
-                                className="shift-code"
-                                style={{ backgroundColor: shiftColor, color: 'white' }}
-                                title={`${shift.shift_name}\n${formatShiftTime(shift.start_time, shift.end_time)}\n${shift.telescope_name || 'No telescope'}`}
-                              >
-                                {shiftCode}{shiftNumber}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="no-shift">—</div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
+                  </td>
+                  {displayDates.map((date, dateIndex) => {
+                    const availability = getAvailabilityForStaffOnDate(staffMember.id, date);
+                    const availCode = availability ? availability.availability_code : 'A';
+                    const availColor = getAvailabilityColor(availCode);
+                    const dateStr = date.toISOString().split('T')[0];
+                    const cellKey = `${staffMember.id}-${dateStr}`;
+                    const isUpdating = updatingCell === cellKey;
+                    const isEditing = editingCell === cellKey;
+                    
+                    return (
+                      <td 
+                        key={dateIndex} 
+                        className={`availability-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${isUpdating ? 'updating' : 'editable'} ${isEditing ? 'editing' : ''}`}
+                        style={{ backgroundColor: availColor }}
+                        onMouseEnter={() => setHoveredColumn(dateIndex)}
+                        onMouseLeave={() => setHoveredColumn(null)}
+                        onClick={(e) => !isUpdating && handleAvailabilityClick(staffMember.id, date, e)}
+                        title={`${availability ? availability.availability_display : 'Available'}\nClick to select status${availability?.notes ? '\n' + availability.notes : ''}`}
+                      >
+                        {isUpdating ? (
+                          <div className="availability-code">⟳</div>
+                        ) : (
+                          <div className="availability-code">{availCode}</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+                
+                {/* Shifts Row */}
+                <tr key={`${staffMember.id}-shifts`} className="staff-shifts-row">
+                  {displayDates.map((date, dateIndex) => {
+                    const dayShifts = getShiftsForStaffOnDate(staffMember.id, date);
+                    
+                    return (
+                      <td 
+                        key={dateIndex} 
+                        className={`shift-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${dayShifts.length > 0 ? 'has-shifts' : 'empty'}`}
+                        onMouseEnter={() => setHoveredColumn(dateIndex)}
+                        onMouseLeave={() => setHoveredColumn(null)}
+                      >
+                        {dayShifts.length > 0 ? (
+                          <div className="shifts-compact">
+                            {dayShifts.map((shift, shiftIndex) => {
+                              const shiftCode = shift.shift_code || '?';
+                              const shiftNumber = dayShifts.length > 1 ? shiftIndex + 1 : '';
+                              const shiftColor = shift.shift_color || '#6b7280';
+                              return (
+                                <span 
+                                  key={shift.id} 
+                                  className="shift-code"
+                                  style={{ backgroundColor: shiftColor, color: 'white' }}
+                                  title={`${shift.shift_name}\n${formatShiftTime(shift.start_time, shift.end_time)}\n${shift.telescope_name || 'No telescope'}`}
+                                >
+                                  {shiftCode}{shiftNumber}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="no-shift">—</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </>
             ))}
           </tbody>
         </table>
@@ -378,6 +546,43 @@ const ScheduleCalendar = () => {
         <div className="no-data">
           No staff members found. Please add staff members to see the schedule.
         </div>
+      )}
+
+      {/* Render dropdown using portal to avoid z-index issues */}
+      {editingCell && editingCellData && createPortal(
+        <div 
+          className="availability-dropdown" 
+          style={{
+            position: 'absolute',
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            transform: 'translateX(-50%)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="dropdown-option available"
+            onClick={() => handleAvailabilityChange(editingCellData.staffId, editingCellData.date, 'A')}
+          >
+            <span className="option-code">A</span>
+            <span className="option-label">Available</span>
+          </button>
+          <button
+            className="dropdown-option maybe"
+            onClick={() => handleAvailabilityChange(editingCellData.staffId, editingCellData.date, '?')}
+          >
+            <span className="option-code">?</span>
+            <span className="option-label">Maybe</span>
+          </button>
+          <button
+            className="dropdown-option unavailable"
+            onClick={() => handleAvailabilityChange(editingCellData.staffId, editingCellData.date, 'X')}
+          >
+            <span className="option-code">X</span>
+            <span className="option-label">Unavailable</span>
+          </button>
+        </div>,
+        document.body
       )}
     </div>
   );
