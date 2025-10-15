@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import './App.css'
 import Home from './features/schedule/Home'
+import StaffList from './features/staff/StaffList'
+import ShiftList from './features/shifts/ShiftList'
 
 function App() {
   return (
@@ -22,8 +24,8 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/schedule" element={<div>Schedule View (Coming Soon)</div>} />
-            <Route path="/staff" element={<div>Staff Management (Coming Soon)</div>} />
-            <Route path="/shifts" element={<div>Shift Management (Coming Soon)</div>} />
+            <Route path="/staff" element={<StaffList />} />
+            <Route path="/shifts" element={<ShiftList />} />
           </Routes>
         </main>
       </div>

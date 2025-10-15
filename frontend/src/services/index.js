@@ -23,11 +23,11 @@ export const authService = {
 
 // Staff
 export const staffService = {
-  getAll: () => api.get('/staff/'),
-  getById: (id) => api.get(`/staff/${id}/`),
-  create: (data) => api.post('/staff/', data),
-  update: (id, data) => api.put(`/staff/${id}/`, data),
-  delete: (id) => api.delete(`/staff/${id}/`),
+  getAll: (params = '') => api.get(`/staff/members/${params}`),
+  getById: (id) => api.get(`/staff/members/${id}/`),
+  create: (data) => api.post('/staff/members/', data),
+  update: (id, data) => api.put(`/staff/members/${id}/`, data),
+  delete: (id) => api.delete(`/staff/members/${id}/`),
 }
 
 // Shifts
