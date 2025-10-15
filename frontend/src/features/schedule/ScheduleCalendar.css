@@ -602,6 +602,10 @@
   flex-grow: 1;
 }
 
+.availability-cell.weekend {
+  filter: brightness(0.92);
+}
+
 .availability-cell.today {
   border: 2px solid var(--today-border);
 }

@@ -41,7 +41,7 @@ class StaffMemberViewSet(viewsets.ModelViewSet):
     serializer_class = StaffMemberSerializer
     # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['role', 'status', 'prefers_night_shifts', 'team']
+    filterset_fields = ['role', 'status', 'prefers_night_shifts', 'team', 'team__name']
     search_fields = ['user__first_name', 'user__last_name', 'employee_id', 'user__email']
     ordering_fields = ['hire_date', 'user__last_name']
     ordering = ['user__last_name']

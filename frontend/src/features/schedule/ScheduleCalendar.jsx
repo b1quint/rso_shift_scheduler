@@ -18,16 +18,24 @@ const ScheduleCalendar = () => {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 }); // Dropdown position
   const [editingCellData, setEditingCellData] = useState(null); // Store staffId and date for editing cell
   
-  // Initialize with current week (today to 6 days later)
+  // Initialize with Sunday of this week to one month later
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const oneWeekLater = new Date(today);
-  oneWeekLater.setDate(today.getDate() + 6);
   
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(oneWeekLater);
-  const [tempStartDate, setTempStartDate] = useState(today.toISOString().split('T')[0]);
-  const [tempEndDate, setTempEndDate] = useState(oneWeekLater.toISOString().split('T')[0]);
+  // Get Sunday of this week
+  const sundayOfThisWeek = new Date(today);
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  sundayOfThisWeek.setDate(today.getDate() - dayOfWeek);
+  
+  // One month later from Sunday
+  const oneMonthLater = new Date(sundayOfThisWeek);
+  oneMonthLater.setMonth(sundayOfThisWeek.getMonth() + 1);
+  oneMonthLater.setDate(oneMonthLater.getDate() - 1); // Subtract 1 day to make it inclusive
+  
+  const [startDate, setStartDate] = useState(sundayOfThisWeek);
+  const [endDate, setEndDate] = useState(oneMonthLater);
+  const [tempStartDate, setTempStartDate] = useState(sundayOfThisWeek.toISOString().split('T')[0]);
+  const [tempEndDate, setTempEndDate] = useState(oneMonthLater.toISOString().split('T')[0]);
 
   // Calculate the dates between start and end
   const getDateRange = (start, end) => {
@@ -105,7 +113,12 @@ const ScheduleCalendar = () => {
         setError(null);
 
         // Fetch staff members (filtered by team if selected)
-        const staffParams = selectedTeam ? { team: selectedTeam } : {};
+        const staffParams = {};
+        if (selectedTeam === 'observing-specialists') {
+          staffParams['team__name'] = 'Observing Specialists';
+        } else if (selectedTeam === 'support-scientists') {
+          staffParams['team__name'] = 'Support Scientists';
+        }
         const staffResponse = await staffService.getAll(staffParams);
         setStaff(staffResponse.data.results || staffResponse.data);
 
@@ -375,12 +388,9 @@ const ScheduleCalendar = () => {
                 onChange={(e) => setSelectedTeam(e.target.value)}
                 className="date-input"
               >
-                <option value="">All Teams</option>
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
+                <option value="">All Staff</option>
+                <option value="observing-specialists">Observing Specialists</option>
+                <option value="support-scientists">Support Scientists</option>
               </select>
             </div>
             <div className="date-input-group">
