@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import './App.css'
 import Home from './features/schedule/Home'
+import ScheduleCalendar from './features/schedule/ScheduleCalendar'
 import StaffList from './features/staff/StaffList'
 import ShiftList from './features/shifts/ShiftList'
 
@@ -23,7 +24,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/schedule" element={<div>Schedule View (Coming Soon)</div>} />
+            <Route path="/schedule" element={<ScheduleCalendar />} />
             <Route path="/staff" element={<StaffList />} />
             <Route path="/shifts" element={<ShiftList />} />
           </Routes>

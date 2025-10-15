@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import StaffMember, StaffAvailability
+from .models import Team, ShiftType, StaffMember, StaffAvailability
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -11,19 +11,43 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
+class TeamSerializer(serializers.ModelSerializer):
+    """Serializer for Team model"""
+    class Meta:
+        model = Team
+        fields = ['id', 'name', 'code', 'description', 'is_active']
+        read_only_fields = ['id']
+
+
+class ShiftTypeSerializer(serializers.ModelSerializer):
+    """Serializer for ShiftType model"""
+    team_name = serializers.CharField(source='team.name', read_only=True)
+    
+    class Meta:
+        model = ShiftType
+        fields = [
+            'id', 'team', 'team_name', 'name', 'code', 'description',
+            'color', 'default_start_time', 'default_end_time',
+            'default_duration_hours', 'is_active', 'sort_order'
+        ]
+        read_only_fields = ['id']
+
+
 class StaffMemberSerializer(serializers.ModelSerializer):
     """Serializer for StaffMember model"""
     user = UserSerializer(read_only=True)
+    team_name = serializers.CharField(source='team.name', read_only=True)
+    team_code = serializers.CharField(source='team.code', read_only=True)
     full_name = serializers.ReadOnlyField()
     is_available = serializers.ReadOnlyField()
     
     class Meta:
         model = StaffMember
         fields = [
-            'id', 'user', 'employee_id', 'role', 'status', 
-            'phone', 'prefers_night_shifts', 'max_consecutive_nights',
-            'min_rest_days', 'hire_date', 'notes', 'full_name', 
-            'is_available', 'created_at', 'updated_at'
+            'id', 'user', 'team', 'team_name', 'team_code', 'employee_id', 
+            'role', 'status', 'phone', 'prefers_night_shifts', 
+            'max_consecutive_nights', 'min_rest_days', 'hire_date', 
+            'notes', 'full_name', 'is_available', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

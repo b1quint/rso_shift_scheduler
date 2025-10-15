@@ -1,23 +1,45 @@
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import StaffMember, StaffAvailability
+from .models import Team, ShiftType, StaffMember, StaffAvailability
 from .serializers import (
+    TeamSerializer,
+    ShiftTypeSerializer,
     StaffMemberSerializer,
     StaffMemberCreateSerializer,
     StaffAvailabilitySerializer
 )
 
 
+class TeamViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for Team read-only operations
+    """
+    queryset = Team.objects.filter(is_active=True)
+    serializer_class = TeamSerializer
+    # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
+
+
+class ShiftTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for ShiftType read-only operations
+    """
+    queryset = ShiftType.objects.filter(is_active=True).select_related('team')
+    serializer_class = ShiftTypeSerializer
+    # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['team']
+
+
 class StaffMemberViewSet(viewsets.ModelViewSet):
     """
     ViewSet for StaffMember CRUD operations
     """
-    queryset = StaffMember.objects.select_related('user').all()
+    queryset = StaffMember.objects.select_related('user', 'team').all()
     serializer_class = StaffMemberSerializer
     # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['role', 'status', 'prefers_night_shifts']
+    filterset_fields = ['role', 'status', 'prefers_night_shifts', 'team']
     search_fields = ['user__first_name', 'user__last_name', 'employee_id', 'user__email']
     ordering_fields = ['hire_date', 'user__last_name']
     ordering = ['user__last_name']

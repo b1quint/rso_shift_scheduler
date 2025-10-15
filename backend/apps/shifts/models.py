@@ -1,5 +1,5 @@
 from django.db import models
-from apps.staff.models import StaffMember
+from apps.staff.models import StaffMember, ShiftType
 from apps.observatory.models import Telescope
 
 
@@ -7,13 +7,6 @@ class Shift(models.Model):
     """
     Represents a single shift assignment.
     """
-    SHIFT_TYPE_CHOICES = [
-        ('day', 'Day Shift'),
-        ('night', 'Night Shift'),
-        ('twilight', 'Twilight Shift'),
-        ('on_call', 'On-Call'),
-    ]
-    
     STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
         ('confirmed', 'Confirmed'),
@@ -23,7 +16,12 @@ class Shift(models.Model):
     ]
     
     # Shift Details
-    shift_type = models.CharField(max_length=20, choices=SHIFT_TYPE_CHOICES)
+    shift_type = models.ForeignKey(
+        ShiftType,
+        on_delete=models.PROTECT,
+        related_name='shifts',
+        help_text="Type of shift (e.g., Day Shift Lead, Late Shift, etc.)"
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
     
     # Timing
@@ -70,7 +68,8 @@ class Shift(models.Model):
     
     def __str__(self):
         staff_name = self.assigned_staff.full_name if self.assigned_staff else "Unassigned"
-        return f"{self.shift_type} - {staff_name} ({self.start_time.date()})"
+        shift_name = self.shift_type.name if self.shift_type else "Unknown"
+        return f"{shift_name} - {staff_name} ({self.start_time.date()})"
     
     @property
     def duration_hours(self):
@@ -78,9 +77,9 @@ class Shift(models.Model):
         return (self.end_time - self.start_time).total_seconds() / 3600
     
     @property
-    def is_night_shift(self):
-        """Check if this is a night shift"""
-        return self.shift_type == 'night'
+    def shift_code(self):
+        """Get the display code for this shift"""
+        return self.shift_type.code if self.shift_type else "?"
     
     def clean(self):
         """Validate that end_time is after start_time"""

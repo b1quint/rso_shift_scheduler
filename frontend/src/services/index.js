@@ -23,7 +23,7 @@ export const authService = {
 
 // Staff
 export const staffService = {
-  getAll: (params = '') => api.get(`/staff/members/${params}`),
+  getAll: (params = {}) => api.get('/staff/members/', { params }),
   getById: (id) => api.get(`/staff/members/${id}/`),
   create: (data) => api.post('/staff/members/', data),
   update: (id, data) => api.put(`/staff/members/${id}/`, data),
@@ -32,7 +32,7 @@ export const staffService = {
 
 // Shifts
 export const shiftService = {
-  getAll: () => api.get('/shifts/'),
+  getAll: (params = {}) => api.get('/shifts/', { params }),
   getById: (id) => api.get(`/shifts/${id}/`),
   create: (data) => api.post('/shifts/', data),
   update: (id, data) => api.put(`/shifts/${id}/`, data),

@@ -2,6 +2,64 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+class Team(models.Model):
+    """
+    Represents a team or department at the observatory.
+    Each team can have different shift types and requirements.
+    """
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, unique=True, help_text="Short code for the team")
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Team'
+        verbose_name_plural = 'Teams'
+    
+    def __str__(self):
+        return self.name
+
+
+class ShiftType(models.Model):
+    """
+    Represents a type of shift specific to a team.
+    Different teams can have different shift types with custom codes.
+    """
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name='shift_types'
+    )
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=10, help_text="Short code displayed in calendar (e.g., D, L, 1, 2)")
+    description = models.TextField(blank=True)
+    color = models.CharField(max_length=7, default='#6b7280', help_text="Hex color code for display")
+    
+    # Default timing (can be overridden per shift)
+    default_start_time = models.TimeField(null=True, blank=True)
+    default_end_time = models.TimeField(null=True, blank=True)
+    default_duration_hours = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+    
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0, help_text="Order for display in lists")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['team', 'sort_order', 'name']
+        unique_together = [['team', 'code']]
+        verbose_name = 'Shift Type'
+        verbose_name_plural = 'Shift Types'
+    
+    def __str__(self):
+        return f"{self.team.name} - {self.name} ({self.code})"
+
+
 class StaffMember(models.Model):
     """
     Represents a staff member at the observatory.
@@ -28,6 +86,15 @@ class StaffMember(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='staff_profile'
+    )
+    
+    # Team Assignment
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='members'
     )
     
     # Staff Information
