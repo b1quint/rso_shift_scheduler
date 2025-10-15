@@ -21,6 +21,11 @@ from django.conf import settings
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    
+    # API endpoints
+    path("api/staff/", include('apps.staff.urls')),
+    path("api/observatory/", include('apps.observatory.urls')),
+    path("api/", include('apps.shifts.urls')),
 ]
 
 # Add debug toolbar URLs in development
