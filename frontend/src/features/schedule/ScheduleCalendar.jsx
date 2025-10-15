@@ -422,7 +422,7 @@ const ScheduleCalendar = () => {
         <table className="schedule-table">
           <thead>
             <tr className="header-row-month">
-              <th className="staff-column-header" rowSpan="3">Staff Member</th>
+              <th className="staff-column-header" colSpan="2" rowSpan="3">Staff Member</th>
               {monthSpans.map((monthSpan, index) => (
                 <th 
                   key={index} 
@@ -474,6 +474,9 @@ const ScheduleCalendar = () => {
                       </div>
                     </div>
                   </td>
+                  <td className="row-label-cell">
+                    <div className="row-label">Avail</div>
+                  </td>
                   {displayDates.map((date, dateIndex) => {
                     const availability = getAvailabilityForStaffOnDate(staffMember.id, date);
                     const availCode = availability ? availability.availability_code : 'A';
@@ -505,6 +508,9 @@ const ScheduleCalendar = () => {
                 
                 {/* Shifts Row */}
                 <tr key={`${staffMember.id}-shifts`} className="staff-shifts-row">
+                  <td className="row-label-cell">
+                    <div className="row-label">Shift</div>
+                  </td>
                   {displayDates.map((date, dateIndex) => {
                     const dayShifts = getShiftsForStaffOnDate(staffMember.id, date);
                     

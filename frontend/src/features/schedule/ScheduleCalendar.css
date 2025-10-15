@@ -208,9 +208,9 @@
 }
 
 .staff-column-header {
-  min-width: 120px;
-  width: 120px;
-  max-width: 120px;
+  min-width: 150px;
+  width: 150px;
+  max-width: 150px;
   background: var(--bg-gray-50);
   position: sticky;
   left: 0;
@@ -617,6 +617,34 @@
   font-size: 0.75rem;
   color: var(--text-primary);
   user-select: none;
+}
+
+/* Row label cells */
+.row-label-cell {
+  background: var(--bg-gray-50);
+  position: sticky;
+  left: 120px;
+  z-index: 5;
+  border-right: 2px solid var(--border-light);
+  min-width: 30px;
+  width: 30px;
+  max-width: 30px;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.row-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.50rem;
+  font-weight: 600;
+  color: var(--border-hover);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0;
+  line-height: 1;
 }
 
 /* Staff row styling - adjust for two-row layout */
