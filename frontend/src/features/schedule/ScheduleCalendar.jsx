@@ -164,9 +164,10 @@ const ScheduleCalendar = () => {
   // Get background color for availability code
   const getAvailabilityColor = (code) => {
     const colors = {
-      'X': '#fee2e2', // red-100
-      '?': '#fef3c7', // yellow-100
-      'A': '#dcfce7'  // green-100
+      '-': 'transparent', // transparent - Not set
+      'X': '#fee2e2',     // red-100 - Unavailable
+      '?': '#fef3c7',     // yellow-100 - Maybe
+      'A': '#dcfce7'      // green-100 - Available
     };
     return colors[code] || '#ffffff';
   };
@@ -350,13 +351,16 @@ const ScheduleCalendar = () => {
           <h1>Staff Schedule</h1>
           <div className="availability-legend">
             <span className="legend-item">
-              <span className="legend-box" style={{ backgroundColor: '#dcfce7' }}>A</span> Available
+              <span className="legend-box not-set">-</span> Not Set
             </span>
             <span className="legend-item">
-              <span className="legend-box" style={{ backgroundColor: '#fef3c7' }}>?</span> Maybe Available
+              <span className="legend-box available">A</span> Available
             </span>
             <span className="legend-item">
-              <span className="legend-box" style={{ backgroundColor: '#fee2e2' }}>X</span> Unavailable
+              <span className="legend-box maybe">?</span> Maybe Available
+            </span>
+            <span className="legend-item">
+              <span className="legend-box unavailable">X</span> Unavailable
             </span>
             <span className="legend-note">💡 Click availability cells to select status</span>
           </div>
@@ -560,6 +564,13 @@ const ScheduleCalendar = () => {
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            className="dropdown-option not-set"
+            onClick={() => handleAvailabilityChange(editingCellData.staffId, editingCellData.date, '-')}
+          >
+            <span className="option-code">-</span>
+            <span className="option-label">Not Set</span>
+          </button>
           <button
             className="dropdown-option available"
             onClick={() => handleAvailabilityChange(editingCellData.staffId, editingCellData.date, 'A')}

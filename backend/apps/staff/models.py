@@ -168,9 +168,10 @@ class StaffAvailability(models.Model):
 class DailyAvailability(models.Model):
     """
     Tracks daily availability status for each staff member.
-    X = Unavailable, ? = Maybe available (prefer not to assign), A = Available
+    - = Not set (default), X = Unavailable, ? = Maybe available (prefer not to assign), A = Available
     """
     AVAILABILITY_CODE_CHOICES = [
+        ('-', 'Not Set'),
         ('X', 'Unavailable'),
         ('?', 'Maybe Available (Prefer Not)'),
         ('A', 'Available'),
@@ -185,8 +186,8 @@ class DailyAvailability(models.Model):
     availability_code = models.CharField(
         max_length=1,
         choices=AVAILABILITY_CODE_CHOICES,
-        default='A',
-        help_text="X=Unavailable, ?=Maybe Available, A=Available"
+        default='-',
+        help_text="-=Not Set, X=Unavailable, ?=Maybe Available, A=Available"
     )
     notes = models.CharField(max_length=200, blank=True)
     
