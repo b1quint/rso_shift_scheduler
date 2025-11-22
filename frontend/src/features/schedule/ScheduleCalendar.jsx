@@ -9,6 +9,7 @@ const ScheduleCalendar = () => {
   const [shifts, setShifts] = useState([]);
   const [dailyAvailability, setDailyAvailability] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [shiftTypes, setShiftTypes] = useState([]); // All shift types for all teams
   const [selectedTeam, setSelectedTeam] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,6 +18,8 @@ const ScheduleCalendar = () => {
   const [editingCell, setEditingCell] = useState(null); // Track which cell has dropdown open
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 }); // Dropdown position
   const [editingCellData, setEditingCellData] = useState(null); // Store staffId and date for editing cell
+  const [editingShiftCell, setEditingShiftCell] = useState(null); // Track which shift cell has dropdown open
+  const [editingShiftCellData, setEditingShiftCellData] = useState(null); // Store staffId and date for editing shift cell
   
   // Initialize with Sunday of this week to one month later
   const today = new Date();
@@ -93,17 +96,20 @@ const ScheduleCalendar = () => {
     setEndDate(monthEnd);
   };
 
-  // Fetch teams on mount
+  // Fetch teams and shift types on mount
   useEffect(() => {
-    const fetchTeams = async () => {
+    const fetchTeamsAndShiftTypes = async () => {
       try {
-        const response = await api.get('/staff/teams/');
-        setTeams(response.data.results || response.data);
+        const teamsResponse = await api.get('/staff/teams/');
+        setTeams(teamsResponse.data.results || teamsResponse.data);
+        
+        const shiftTypesResponse = await api.get('/staff/shift-types/');
+        setShiftTypes(shiftTypesResponse.data.results || shiftTypesResponse.data);
       } catch (err) {
-        console.error('Error fetching teams:', err);
+        console.error('Error fetching teams/shift types:', err);
       }
     };
-    fetchTeams();
+    fetchTeamsAndShiftTypes();
   }, []);
 
   useEffect(() => {
@@ -126,11 +132,25 @@ const ScheduleCalendar = () => {
         const startDateStr = startDate.toISOString().split('T')[0];
         const endDateStr = endDate.toISOString().split('T')[0];
         
-        const shiftsResponse = await shiftService.getAll({
-          start_time__gte: startDateStr,
-          start_time__lte: endDateStr
-        });
-        setShifts(shiftsResponse.data.results || shiftsResponse.data);
+        // Fetch all shifts without pagination
+        let allShifts = [];
+        let nextUrl = null;
+        let pageNum = 1;
+        
+        do {
+          const shiftsResponse = await shiftService.getAll({
+            start_time__gte: startDateStr,
+            start_time__lte: endDateStr,
+            page: pageNum
+          });
+          
+          const pageShifts = shiftsResponse.data.results || [];
+          allShifts = allShifts.concat(pageShifts);
+          nextUrl = shiftsResponse.data.next;
+          pageNum++;
+        } while (nextUrl && pageNum <= 10); // Safety limit
+        
+        setShifts(allShifts);
 
         // Fetch daily availability for the date range (with large page size to get all records)
         const availabilityResponse = await api.get('/staff/daily-availability/', {
@@ -262,11 +282,115 @@ const ScheduleCalendar = () => {
         setEditingCell(null);
         setEditingCellData(null);
       }
+      if (editingShiftCell && !event.target.closest('.shift-dropdown')) {
+        setEditingShiftCell(null);
+        setEditingShiftCellData(null);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [editingCell]);
+  }, [editingCell, editingShiftCell]);
+
+  // Get shift types for a staff member's team
+  const getShiftTypesForStaff = (staffMember) => {
+    if (!staffMember.team || shiftTypes.length === 0) {
+      return [];
+    }
+    
+    return shiftTypes.filter(st => st.team === staffMember.team && st.is_active);
+  };
+
+  // Handle shift cell click to show dropdown
+  const handleShiftClick = (staffId, date, event) => {
+    event.stopPropagation();
+    const dateStr = date.toISOString().split('T')[0];
+    const cellKey = `shift-${staffId}-${dateStr}`;
+    
+    // If clicking the same cell, close it
+    if (editingShiftCell === cellKey) {
+      setEditingShiftCell(null);
+      setEditingShiftCellData(null);
+      return;
+    }
+    
+    // Calculate position for fixed dropdown
+    const rect = event.currentTarget.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY + 4,
+      left: rect.left + window.scrollX + (rect.width / 2)
+    });
+    
+    setEditingShiftCell(cellKey);
+    setEditingShiftCellData({ staffId, date });
+  };
+
+  // Handle shift selection from dropdown
+  const handleShiftChange = async (staffId, date, shiftTypeId) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const cellKey = `shift-${staffId}-${dateStr}`;
+    
+    setEditingShiftCell(null);
+    setEditingShiftCellData(null);
+    setUpdatingCell(cellKey);
+
+    try {
+      const currentShifts = getShiftsForStaffOnDate(staffId, date);
+      
+      if (shiftTypeId === 'none') {
+        // Delete all shifts for this staff on this date
+        for (const shift of currentShifts) {
+          await shiftService.delete(shift.id);
+        }
+      } else {
+        // Delete existing shifts first
+        for (const shift of currentShifts) {
+          await shiftService.delete(shift.id);
+        }
+        
+        // Create new shift
+        const shiftType = shiftTypes.find(st => st.id === shiftTypeId);
+        const newShift = await shiftService.create({
+          assigned_staff: staffId,
+          shift_type: shiftTypeId,
+          start_time: `${dateStr}T${shiftType.default_start_time || '00:00:00'}`,
+          end_time: `${dateStr}T${shiftType.default_end_time || '23:59:59'}`
+        });
+      }
+
+      // Refresh shifts data
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      console.log('Refreshing shifts with date range:', startDateStr, 'to', endDateStr);
+      
+      // Fetch all shifts without pagination
+      let allShifts = [];
+      let nextUrl = null;
+      let pageNum = 1;
+      
+      do {
+        const shiftsResponse = await shiftService.getAll({
+          start_time__gte: startDateStr,
+          start_time__lte: endDateStr,
+          page: pageNum
+        });
+        const pageShifts = shiftsResponse.data.results || [];
+        allShifts = allShifts.concat(pageShifts);
+        nextUrl = shiftsResponse.data.next;
+        pageNum++;
+      } while (nextUrl && pageNum <= 10); // Safety limit
+      setShifts(allShifts);
+    } catch (err) {
+      console.error('Error updating shift:', err);
+      console.error('Error response:', err.response);
+      console.error('Error response data:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      const errorMsg = err.response?.data?.detail || err.response?.data?.error || JSON.stringify(err.response?.data) || 'Unknown error';
+      alert(`Failed to update shift: ${errorMsg}`);
+    } finally {
+      setUpdatingCell(null);
+    }
+  };
 
   // Format date parts for column headers
   const getMonthName = (date) => {
@@ -523,15 +647,24 @@ const ScheduleCalendar = () => {
                   </td>
                   {displayDates.map((date, dateIndex) => {
                     const dayShifts = getShiftsForStaffOnDate(staffMember.id, date);
+                    const dateStr = date.toISOString().split('T')[0];
+                    const cellKey = `shift-${staffMember.id}-${dateStr}`;
+                    const isUpdating = updatingCell === cellKey;
+                    const isEditing = editingShiftCell === cellKey;
                     
                     return (
                       <td 
                         key={dateIndex} 
-                        className={`shift-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${dayShifts.length > 0 ? 'has-shifts' : 'empty'}`}
+                        className={`shift-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${dayShifts.length > 0 ? 'has-shifts' : 'empty'} ${isUpdating ? 'updating' : 'editable'} ${isEditing ? 'editing' : ''}`}
                         onMouseEnter={() => setHoveredColumn(dateIndex)}
                         onMouseLeave={() => setHoveredColumn(null)}
+                        onClick={(e) => !isUpdating && handleShiftClick(staffMember.id, date, e)}
+                        style={{ cursor: isUpdating ? 'wait' : 'pointer' }}
+                        title={`Click to assign shift${dayShifts.length > 0 ? '\n' + dayShifts.map(s => `${s.shift_name} (${s.shift_code})`).join(', ') : ''}`}
                       >
-                        {dayShifts.length > 0 ? (
+                        {isUpdating ? (
+                          <div className="shift-code">⟳</div>
+                        ) : dayShifts.length > 0 ? (
                           <div className="shifts-compact">
                             {dayShifts.map((shift, shiftIndex) => {
                               const shiftCode = shift.shift_code || '?';
@@ -542,7 +675,6 @@ const ScheduleCalendar = () => {
                                   key={shift.id} 
                                   className="shift-code"
                                   style={{ backgroundColor: shiftColor, color: 'white' }}
-                                  title={`${shift.shift_name}\n${formatShiftTime(shift.start_time, shift.end_time)}\n${shift.telescope_name || 'No telescope'}`}
                                 >
                                   {shiftCode}{shiftNumber}
                                 </span>
@@ -608,6 +740,49 @@ const ScheduleCalendar = () => {
             <span className="option-code">X</span>
             <span className="option-label">Unavailable</span>
           </button>
+        </div>,
+        document.body
+      )}
+
+      {/* Render shift dropdown using portal */}
+      {editingShiftCell && editingShiftCellData && createPortal(
+        <div 
+          className="shift-dropdown availability-dropdown" 
+          style={{
+            position: 'absolute',
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            transform: 'translateX(-50%)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="dropdown-option"
+            onClick={() => handleShiftChange(editingShiftCellData.staffId, editingShiftCellData.date, 'none')}
+          >
+            <span className="option-code">—</span>
+            <span className="option-label">No Shift</span>
+          </button>
+          {(() => {
+            const staffMember = staff.find(s => s.id === editingShiftCellData.staffId);
+            if (!staffMember) return null;
+            const availableShiftTypes = getShiftTypesForStaff(staffMember);
+            return availableShiftTypes.map((shiftType) => (
+              <button
+                key={shiftType.id}
+                className="dropdown-option"
+                onClick={() => handleShiftChange(editingShiftCellData.staffId, editingShiftCellData.date, shiftType.id)}
+              >
+                <span 
+                  className="option-code shift-code" 
+                  style={{ backgroundColor: shiftType.color, color: 'white' }}
+                >
+                  {shiftType.code}
+                </span>
+                <span className="option-label">{shiftType.name}</span>
+              </button>
+            ));
+          })()}
         </div>,
         document.body
       )}

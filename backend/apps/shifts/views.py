@@ -33,7 +33,11 @@ class ShiftViewSet(viewsets.ModelViewSet):
         return ShiftSerializer
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        # Only set created_by if user is authenticated
+        if self.request.user.is_authenticated:
+            serializer.save(created_by=self.request.user)
+        else:
+            serializer.save()
 
 
 class ScheduleViewSet(viewsets.ModelViewSet):
@@ -55,4 +59,8 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         return ScheduleSerializer
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        # Only set created_by if user is authenticated
+        if self.request.user.is_authenticated:
+            serializer.save(created_by=self.request.user)
+        else:
+            serializer.save()
