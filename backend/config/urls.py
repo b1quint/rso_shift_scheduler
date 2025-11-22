@@ -22,6 +22,9 @@ from django.conf import settings
 urlpatterns = [
     path("admin/", admin.site.urls),
     
+    # Authentication endpoints
+    path("api/auth/", include('apps.users.urls')),
+    
     # API endpoints
     path("api/staff/", include('apps.staff.urls')),
     path("api/observatory/", include('apps.observatory.urls')),

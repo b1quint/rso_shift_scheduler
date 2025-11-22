@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # Third-party apps
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
     "debug_toolbar",
@@ -150,10 +151,8 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        # Temporarily allow unauthenticated access for development
-        'rest_framework.permissions.AllowAny',
-        # TODO: Change back to IsAuthenticated in production
-        # 'rest_framework.permissions.IsAuthenticated',
+        # Allow read-only access for anonymous users, require auth for write operations
+        'apps.users.permissions.IsAuthenticatedOrReadOnly',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,

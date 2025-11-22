@@ -2,23 +2,10 @@ import api from './api'
 
 // Authentication
 export const authService = {
-  login: async (username, password) => {
-    const response = await api.post('/auth/login/', { username, password })
-    if (response.data.access) {
-      localStorage.setItem('access_token', response.data.access)
-      localStorage.setItem('refresh_token', response.data.refresh)
-    }
-    return response.data
-  },
-
-  logout: () => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-  },
-
-  isAuthenticated: () => {
-    return !!localStorage.getItem('access_token')
-  },
+  login: (username, password) => api.post('/auth/login/', { username, password }),
+  logout: (refreshToken) => api.post('/auth/logout/', { refresh: refreshToken }),
+  getCurrentUser: () => api.get('/auth/me/'),
+  refreshToken: (refresh) => api.post('/auth/refresh/', { refresh }),
 }
 
 // Staff

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../services/api';
 import { staffService, shiftService } from '../../services';
+import { useAuth } from '../../contexts/AuthContext';
 import './ScheduleCalendar.css';
 
 const ScheduleCalendar = () => {
+  const { isAuthenticated } = useAuth();
   const [staff, setStaff] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [dailyAvailability, setDailyAvailability] = useState([]);
@@ -20,21 +22,21 @@ const ScheduleCalendar = () => {
   const [editingCellData, setEditingCellData] = useState(null); // Store staffId and date for editing cell
   const [editingShiftCell, setEditingShiftCell] = useState(null); // Track which shift cell has dropdown open
   const [editingShiftCellData, setEditingShiftCellData] = useState(null); // Store staffId and date for editing shift cell
-  
+
   // Initialize with Sunday of this week to one month later
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   // Get Sunday of this week
   const sundayOfThisWeek = new Date(today);
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
   sundayOfThisWeek.setDate(today.getDate() - dayOfWeek);
-  
+
   // One month later from Sunday
   const oneMonthLater = new Date(sundayOfThisWeek);
   oneMonthLater.setMonth(sundayOfThisWeek.getMonth() + 1);
   oneMonthLater.setDate(oneMonthLater.getDate() - 1); // Subtract 1 day to make it inclusive
-  
+
   const [startDate, setStartDate] = useState(sundayOfThisWeek);
   const [endDate, setEndDate] = useState(oneMonthLater);
   const [tempStartDate, setTempStartDate] = useState(sundayOfThisWeek.toISOString().split('T')[0]);
@@ -45,7 +47,7 @@ const ScheduleCalendar = () => {
     const dates = [];
     const currentDate = new Date(start);
     const endDate = new Date(end);
-    
+
     while (currentDate <= endDate) {
       dates.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
@@ -59,15 +61,15 @@ const ScheduleCalendar = () => {
   const handleUpdateDateRange = () => {
     const start = new Date(tempStartDate);
     const end = new Date(tempEndDate);
-    
+
     if (start > end) {
       alert('Start date must be before or equal to end date');
       return;
     }
-    
+
     start.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
-    
+
     setStartDate(start);
     setEndDate(end);
   };
@@ -78,7 +80,7 @@ const ScheduleCalendar = () => {
     today.setHours(0, 0, 0, 0);
     const weekEnd = new Date(today);
     weekEnd.setDate(today.getDate() + 6);
-    
+
     setTempStartDate(today.toISOString().split('T')[0]);
     setTempEndDate(weekEnd.toISOString().split('T')[0]);
     setStartDate(today);
@@ -89,7 +91,7 @@ const ScheduleCalendar = () => {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
+
     setTempStartDate(monthStart.toISOString().split('T')[0]);
     setTempEndDate(monthEnd.toISOString().split('T')[0]);
     setStartDate(monthStart);
@@ -102,7 +104,7 @@ const ScheduleCalendar = () => {
       try {
         const teamsResponse = await api.get('/staff/teams/');
         setTeams(teamsResponse.data.results || teamsResponse.data);
-        
+
         const shiftTypesResponse = await api.get('/staff/shift-types/');
         setShiftTypes(shiftTypesResponse.data.results || shiftTypesResponse.data);
       } catch (err) {
@@ -131,25 +133,25 @@ const ScheduleCalendar = () => {
         // Fetch shifts for the selected date range
         const startDateStr = startDate.toISOString().split('T')[0];
         const endDateStr = endDate.toISOString().split('T')[0];
-        
+
         // Fetch all shifts without pagination
         let allShifts = [];
         let nextUrl = null;
         let pageNum = 1;
-        
+
         do {
           const shiftsResponse = await shiftService.getAll({
             start_time__gte: startDateStr,
             start_time__lte: endDateStr,
             page: pageNum
           });
-          
+
           const pageShifts = shiftsResponse.data.results || [];
           allShifts = allShifts.concat(pageShifts);
           nextUrl = shiftsResponse.data.next;
           pageNum++;
         } while (nextUrl && pageNum <= 10); // Safety limit
-        
+
         setShifts(allShifts);
 
         // Fetch daily availability for the date range (with large page size to get all records)
@@ -176,7 +178,7 @@ const ScheduleCalendar = () => {
   // Find shifts for a specific staff member on a specific date
   const getShiftsForStaffOnDate = (staffId, date) => {
     const dateStr = date.toISOString().split('T')[0];
-    
+
     return shifts.filter(shift => {
       const shiftDate = new Date(shift.start_time).toISOString().split('T')[0];
       return shift.assigned_staff === staffId && shiftDate === dateStr;
@@ -186,11 +188,11 @@ const ScheduleCalendar = () => {
   // Find availability for a specific staff member on a specific date
   const getAvailabilityForStaffOnDate = (staffId, date) => {
     const dateStr = date.toISOString().split('T')[0];
-    
-    const found = dailyAvailability.find(avail => 
+
+    const found = dailyAvailability.find(avail =>
       avail.staff_member === staffId && avail.date === dateStr
     );
-    
+
     return found;
   };
 
@@ -207,24 +209,25 @@ const ScheduleCalendar = () => {
 
   // Handle click on availability cell to show dropdown
   const handleAvailabilityClick = (staffId, date, event) => {
+    if (!isAuthenticated) return; // Read-only for anonymous users
     event.stopPropagation();
     const dateStr = date.toISOString().split('T')[0];
     const cellKey = `${staffId}-${dateStr}`;
-    
+
     // If clicking the same cell, close it
     if (editingCell === cellKey) {
       setEditingCell(null);
       setEditingCellData(null);
       return;
     }
-    
+
     // Calculate position for fixed dropdown
     const rect = event.currentTarget.getBoundingClientRect();
     setDropdownPosition({
       top: rect.bottom + window.scrollY + 4, // 4px below the cell, accounting for scroll
       left: rect.left + window.scrollX + (rect.width / 2) // Center horizontally, accounting for scroll
     });
-    
+
     setEditingCell(cellKey);
     setEditingCellData({ staffId, date });
   };
@@ -233,11 +236,11 @@ const ScheduleCalendar = () => {
   const handleAvailabilityChange = async (staffId, date, newCode) => {
     const dateStr = date.toISOString().split('T')[0];
     const cellKey = `${staffId}-${dateStr}`;
-    
+
     setEditingCell(null); // Close dropdown
     setEditingCellData(null);
     setUpdatingCell(cellKey);
-    
+
     const currentAvailability = getAvailabilityForStaffOnDate(staffId, date);
 
     try {
@@ -297,30 +300,31 @@ const ScheduleCalendar = () => {
     if (!staffMember.team || shiftTypes.length === 0) {
       return [];
     }
-    
+
     return shiftTypes.filter(st => st.team === staffMember.team && st.is_active);
   };
 
   // Handle shift cell click to show dropdown
   const handleShiftClick = (staffId, date, event) => {
+    if (!isAuthenticated) return; // Read-only for anonymous users
     event.stopPropagation();
     const dateStr = date.toISOString().split('T')[0];
     const cellKey = `shift-${staffId}-${dateStr}`;
-    
+
     // If clicking the same cell, close it
     if (editingShiftCell === cellKey) {
       setEditingShiftCell(null);
       setEditingShiftCellData(null);
       return;
     }
-    
+
     // Calculate position for fixed dropdown
     const rect = event.currentTarget.getBoundingClientRect();
     setDropdownPosition({
       top: rect.bottom + window.scrollY + 4,
       left: rect.left + window.scrollX + (rect.width / 2)
     });
-    
+
     setEditingShiftCell(cellKey);
     setEditingShiftCellData({ staffId, date });
   };
@@ -329,14 +333,14 @@ const ScheduleCalendar = () => {
   const handleShiftChange = async (staffId, date, shiftTypeId) => {
     const dateStr = date.toISOString().split('T')[0];
     const cellKey = `shift-${staffId}-${dateStr}`;
-    
+
     setEditingShiftCell(null);
     setEditingShiftCellData(null);
     setUpdatingCell(cellKey);
 
     try {
       const currentShifts = getShiftsForStaffOnDate(staffId, date);
-      
+
       if (shiftTypeId === 'none') {
         // Delete all shifts for this staff on this date
         for (const shift of currentShifts) {
@@ -347,7 +351,7 @@ const ScheduleCalendar = () => {
         for (const shift of currentShifts) {
           await shiftService.delete(shift.id);
         }
-        
+
         // Create new shift
         const shiftType = shiftTypes.find(st => st.id === shiftTypeId);
         const newShift = await shiftService.create({
@@ -362,12 +366,12 @@ const ScheduleCalendar = () => {
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
       console.log('Refreshing shifts with date range:', startDateStr, 'to', endDateStr);
-      
+
       // Fetch all shifts without pagination
       let allShifts = [];
       let nextUrl = null;
       let pageNum = 1;
-      
+
       do {
         const shiftsResponse = await shiftService.getAll({
           start_time__gte: startDateStr,
@@ -415,7 +419,7 @@ const ScheduleCalendar = () => {
     displayDates.forEach((date, index) => {
       const month = date.getMonth();
       const year = date.getFullYear();
-      
+
       if (currentMonth === month && currentYear === year) {
         span++;
       } else {
@@ -426,7 +430,7 @@ const ScheduleCalendar = () => {
         currentYear = year;
         span = 1;
       }
-      
+
       if (index === displayDates.length - 1) {
         spans.push({ month: currentMonth, year: currentYear, span });
       }
@@ -499,7 +503,7 @@ const ScheduleCalendar = () => {
             <span className="legend-item">
               <span className="legend-box unavailable">X</span> Unavailable
             </span>
-            <span className="legend-note">💡 Click availability cells to select status</span>
+            <span className="legend-note">💡 {isAuthenticated ? 'Click availability cells to select status' : 'Login to edit schedules'}</span>
           </div>
         </div>
         <div className="date-range-controls">
@@ -558,8 +562,8 @@ const ScheduleCalendar = () => {
             <tr className="header-row-month">
               <th className="staff-column-header" colSpan="2" rowSpan="3">Staff Member</th>
               {monthSpans.map((monthSpan, index) => (
-                <th 
-                  key={index} 
+                <th
+                  key={index}
                   colSpan={monthSpan.span}
                   className="date-column-header month-header"
                 >
@@ -569,8 +573,8 @@ const ScheduleCalendar = () => {
             </tr>
             <tr className="header-row-date">
               {displayDates.map((date, index) => (
-                <th 
-                  key={index} 
+                <th
+                  key={index}
                   className={`date-column-header date-number ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === index ? 'hovered' : ''}`}
                   onMouseEnter={() => setHoveredColumn(index)}
                   onMouseLeave={() => setHoveredColumn(null)}
@@ -581,8 +585,8 @@ const ScheduleCalendar = () => {
             </tr>
             <tr className="header-row-weekday">
               {displayDates.map((date, index) => (
-                <th 
-                  key={index} 
+                <th
+                  key={index}
                   className={`date-column-header weekday-header ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === index ? 'hovered' : ''}`}
                   onMouseEnter={() => setHoveredColumn(index)}
                   onMouseLeave={() => setHoveredColumn(null)}
@@ -619,10 +623,10 @@ const ScheduleCalendar = () => {
                     const cellKey = `${staffMember.id}-${dateStr}`;
                     const isUpdating = updatingCell === cellKey;
                     const isEditing = editingCell === cellKey;
-                    
+
                     return (
-                      <td 
-                        key={dateIndex} 
+                      <td
+                        key={dateIndex}
                         className={`availability-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${isUpdating ? 'updating' : 'editable'} ${isEditing ? 'editing' : ''}`}
                         style={{ backgroundColor: availColor }}
                         onMouseEnter={() => setHoveredColumn(dateIndex)}
@@ -639,7 +643,7 @@ const ScheduleCalendar = () => {
                     );
                   })}
                 </tr>
-                
+
                 {/* Shifts Row */}
                 <tr key={`${staffMember.id}-shifts`} className="staff-shifts-row">
                   <td className="row-label-cell">
@@ -651,10 +655,10 @@ const ScheduleCalendar = () => {
                     const cellKey = `shift-${staffMember.id}-${dateStr}`;
                     const isUpdating = updatingCell === cellKey;
                     const isEditing = editingShiftCell === cellKey;
-                    
+
                     return (
-                      <td 
-                        key={dateIndex} 
+                      <td
+                        key={dateIndex}
                         className={`shift-cell ${isToday(date) ? 'today' : ''} ${isWeekend(date) ? 'weekend' : ''} ${hoveredColumn === dateIndex ? 'hovered' : ''} ${dayShifts.length > 0 ? 'has-shifts' : 'empty'} ${isUpdating ? 'updating' : 'editable'} ${isEditing ? 'editing' : ''}`}
                         onMouseEnter={() => setHoveredColumn(dateIndex)}
                         onMouseLeave={() => setHoveredColumn(null)}
@@ -671,8 +675,8 @@ const ScheduleCalendar = () => {
                               const shiftNumber = dayShifts.length > 1 ? shiftIndex + 1 : '';
                               const shiftColor = shift.shift_color || '#6b7280';
                               return (
-                                <span 
-                                  key={shift.id} 
+                                <span
+                                  key={shift.id}
                                   className="shift-code"
                                   style={{ backgroundColor: shiftColor, color: 'white' }}
                                 >
@@ -702,8 +706,8 @@ const ScheduleCalendar = () => {
 
       {/* Render dropdown using portal to avoid z-index issues */}
       {editingCell && editingCellData && createPortal(
-        <div 
-          className="availability-dropdown" 
+        <div
+          className="availability-dropdown"
           style={{
             position: 'absolute',
             top: `${dropdownPosition.top}px`,
@@ -746,8 +750,8 @@ const ScheduleCalendar = () => {
 
       {/* Render shift dropdown using portal */}
       {editingShiftCell && editingShiftCellData && createPortal(
-        <div 
-          className="shift-dropdown availability-dropdown" 
+        <div
+          className="shift-dropdown availability-dropdown"
           style={{
             position: 'absolute',
             top: `${dropdownPosition.top}px`,
@@ -773,8 +777,8 @@ const ScheduleCalendar = () => {
                 className="dropdown-option"
                 onClick={() => handleShiftChange(editingShiftCellData.staffId, editingShiftCellData.date, shiftType.id)}
               >
-                <span 
-                  className="option-code shift-code" 
+                <span
+                  className="option-code shift-code"
                   style={{ backgroundColor: shiftType.color, color: 'white' }}
                 >
                   {shiftType.code}
