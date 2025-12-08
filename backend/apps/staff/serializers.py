@@ -59,17 +59,55 @@ class StaffMemberCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = StaffMember
         fields = [
-            'id', 'user_data', 'employee_id', 'role', 'status',
+            'id', 'user_data', 'team', 'employee_id', 'role', 'status',
             'phone', 'prefers_night_shifts', 'max_consecutive_nights',
-            'min_rest_days', 'hire_date', 'notes'
+            'min_rest_days', 'hire_date', 'notes', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def create(self, validated_data):
         user_data = validated_data.pop('user_data')
         user = User.objects.create(**user_data)
         staff_member = StaffMember.objects.create(user=user, **validated_data)
         return staff_member
+    
+    def to_representation(self, instance):
+        # Use the standard serializer for output
+        return StaffMemberSerializer(instance).data
+
+
+class StaffMemberUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating StaffMember with user fields"""
+    # Nested serializer for updating user fields (all fields optional for updates)
+    user_data = serializers.DictField(child=serializers.CharField(), required=False, allow_null=True)
+    
+    class Meta:
+        model = StaffMember
+        fields = [
+            'id', 'user_data', 'team', 'employee_id', 'role', 'status',
+            'phone', 'prefers_night_shifts', 'max_consecutive_nights',
+            'min_rest_days', 'hire_date', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user_data', None)
+        if user_data:
+            # Update only the user fields that are provided
+            for field, value in user_data.items():
+                if field in ['username', 'email', 'first_name', 'last_name'] and hasattr(instance.user, field):
+                    setattr(instance.user, field, value)
+            instance.user.save()
+        
+        # Update staff member fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+    
+    def to_representation(self, instance):
+        # Use the standard serializer for output
+        return StaffMemberSerializer(instance).data
 
 
 class StaffAvailabilitySerializer(serializers.ModelSerializer):

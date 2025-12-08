@@ -7,30 +7,41 @@ from .serializers import (
     ShiftTypeSerializer,
     StaffMemberSerializer,
     StaffMemberCreateSerializer,
+    StaffMemberUpdateSerializer,
     StaffAvailabilitySerializer,
     DailyAvailabilitySerializer
 )
 from .pagination import LargeResultsSetPagination
 
 
-class TeamViewSet(viewsets.ReadOnlyModelViewSet):
+class TeamViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for Team read-only operations
+    ViewSet for Team CRUD operations.
+    Supports creating, reading, updating, and deleting teams.
     """
-    queryset = Team.objects.filter(is_active=True)
+    queryset = Team.objects.all()
     serializer_class = TeamSerializer
     # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['name', 'code', 'description']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
 
 
-class ShiftTypeViewSet(viewsets.ReadOnlyModelViewSet):
+class ShiftTypeViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for ShiftType read-only operations
+    ViewSet for ShiftType CRUD operations.
+    Supports creating, reading, updating, and deleting shift types.
     """
-    queryset = ShiftType.objects.filter(is_active=True).select_related('team')
+    queryset = ShiftType.objects.all().select_related('team')
     serializer_class = ShiftTypeSerializer
     # permission_classes = [IsAuthenticated]  # Temporarily disabled for testing
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['team']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['team', 'is_active']
+    search_fields = ['name', 'code', 'description']
+    ordering_fields = ['name', 'sort_order', 'created_at']
+    ordering = ['team', 'sort_order']
 
 
 class StaffMemberViewSet(viewsets.ModelViewSet):
@@ -49,6 +60,8 @@ class StaffMemberViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return StaffMemberCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return StaffMemberUpdateSerializer
         return StaffMemberSerializer
 
 
