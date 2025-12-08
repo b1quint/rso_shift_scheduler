@@ -78,8 +78,12 @@ class StaffMemberCreateSerializer(serializers.ModelSerializer):
 
 class StaffMemberUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating StaffMember with user fields"""
-    # Nested serializer for updating user fields (all fields optional for updates)
-    user_data = serializers.DictField(child=serializers.CharField(), required=False, allow_null=True)
+    # Nested dict for updating user fields (all fields optional for updates)
+    # Using DictField without child restriction to support mixed data types
+    user_data = serializers.DictField(required=False, allow_null=True)
+    
+    # Allowed user fields that can be updated
+    ALLOWED_USER_FIELDS = {'username', 'email', 'first_name', 'last_name'}
     
     class Meta:
         model = StaffMember
@@ -93,9 +97,9 @@ class StaffMemberUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user_data', None)
         if user_data:
-            # Update only the user fields that are provided
+            # Update only allowed user fields that are provided
             for field, value in user_data.items():
-                if field in ['username', 'email', 'first_name', 'last_name'] and hasattr(instance.user, field):
+                if field in self.ALLOWED_USER_FIELDS and hasattr(instance.user, field):
                     setattr(instance.user, field, value)
             instance.user.save()
         

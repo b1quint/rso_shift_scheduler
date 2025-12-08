@@ -105,6 +105,10 @@ class TeamAPITest(APITestCase):
             'is_active': True
         }
     
+    def get_response_data(self, response):
+        """Helper method to handle both paginated and non-paginated responses"""
+        return response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+    
     def test_create_team(self):
         """Test creating a team via API"""
         initial_count = Team.objects.count()
@@ -119,8 +123,7 @@ class TeamAPITest(APITestCase):
         Team.objects.create(**self.team_data)
         response = self.client.get('/api/staff/teams/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Handle both paginated and non-paginated responses
-        data = response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+        data = self.get_response_data(response)
         # Check that our test team is in the results
         self.assertTrue(any(t['code'] == 'TT' for t in data))
     
@@ -170,6 +173,10 @@ class ShiftTypeAPITest(APITestCase):
             'sort_order': 1
         }
     
+    def get_response_data(self, response):
+        """Helper method to handle both paginated and non-paginated responses"""
+        return response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+    
     def test_create_shift_type(self):
         """Test creating a shift type via API"""
         initial_count = ShiftType.objects.count()
@@ -188,8 +195,7 @@ class ShiftTypeAPITest(APITestCase):
         
         response = self.client.get('/api/staff/shift-types/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Handle both paginated and non-paginated responses
-        data = response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+        data = self.get_response_data(response)
         # Check that our test shift type is in the results
         self.assertTrue(any(st['code'] == 'D' for st in data))
     
@@ -202,8 +208,7 @@ class ShiftTypeAPITest(APITestCase):
         
         response = self.client.get(f'/api/staff/shift-types/?team={self.team.id}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Handle both paginated and non-paginated responses
-        data = response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+        data = self.get_response_data(response)
         # Check that all results belong to our team
         for st in data:
             self.assertEqual(st['team'], self.team.id)
@@ -262,6 +267,10 @@ class StaffMemberAPITest(APITestCase):
             'hire_date': '2020-01-01'
         }
     
+    def get_response_data(self, response):
+        """Helper method to handle both paginated and non-paginated responses"""
+        return response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+    
     def test_create_staff_member(self):
         """Test creating a staff member via API"""
         initial_staff_count = StaffMember.objects.count()
@@ -288,8 +297,7 @@ class StaffMemberAPITest(APITestCase):
         )
         response = self.client.get('/api/staff/members/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # Handle both paginated and non-paginated responses
-        data = response.data if isinstance(response.data, list) else response.data.get('results', response.data)
+        data = self.get_response_data(response)
         # Check that our test staff member is in the results
         self.assertTrue(any(s['employee_id'] == 'EMP002' for s in data))
     

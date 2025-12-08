@@ -18,6 +18,9 @@ class TeamViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Team CRUD operations.
     Supports creating, reading, updating, and deleting teams.
+    
+    Note: Returns all teams (active and inactive) to allow management
+    of inactive teams. Use ?is_active=true query param to filter for active only.
     """
     queryset = Team.objects.all()
     serializer_class = TeamSerializer
@@ -33,6 +36,9 @@ class ShiftTypeViewSet(viewsets.ModelViewSet):
     """
     ViewSet for ShiftType CRUD operations.
     Supports creating, reading, updating, and deleting shift types.
+    
+    Note: Returns all shift types (active and inactive) to allow management
+    of inactive shift types. Use ?is_active=true query param to filter for active only.
     """
     queryset = ShiftType.objects.all().select_related('team')
     serializer_class = ShiftTypeSerializer
