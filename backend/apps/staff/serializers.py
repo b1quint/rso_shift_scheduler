@@ -59,17 +59,93 @@ class StaffMemberCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = StaffMember
         fields = [
-            'id', 'user_data', 'employee_id', 'role', 'status',
+            'id', 'user_data', 'team', 'employee_id', 'role', 'status',
             'phone', 'prefers_night_shifts', 'max_consecutive_nights',
-            'min_rest_days', 'hire_date', 'notes'
+            'min_rest_days', 'hire_date', 'notes', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def create(self, validated_data):
         user_data = validated_data.pop('user_data')
         user = User.objects.create(**user_data)
         staff_member = StaffMember.objects.create(user=user, **validated_data)
         return staff_member
+    
+    def to_representation(self, instance):
+        # Use the standard serializer for output
+        return StaffMemberSerializer(instance).data
+
+
+class StaffMemberUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for updating StaffMember with user fields"""
+    # Nested dict for updating user fields (all fields optional for updates)
+    user_data = serializers.DictField(required=False, allow_null=True)
+    
+    # Allowed user fields that can be updated with their expected types
+    ALLOWED_USER_FIELDS = {
+        'username': str,
+        'email': str,
+        'first_name': str,
+        'last_name': str,
+    }
+    
+    class Meta:
+        model = StaffMember
+        fields = [
+            'id', 'user_data', 'team', 'employee_id', 'role', 'status',
+            'phone', 'prefers_night_shifts', 'max_consecutive_nights',
+            'min_rest_days', 'hire_date', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def validate_user_data(self, value):
+        """Validate user_data fields"""
+        if not value:
+            return value
+        
+        for field, field_value in value.items():
+            if field not in self.ALLOWED_USER_FIELDS:
+                raise serializers.ValidationError(
+                    f"'{field}' is not an allowed user field. "
+                    f"Allowed fields: {', '.join(self.ALLOWED_USER_FIELDS.keys())}"
+                )
+            
+            # Validate data type
+            expected_type = self.ALLOWED_USER_FIELDS[field]
+            if not isinstance(field_value, expected_type):
+                raise serializers.ValidationError(
+                    f"'{field}' must be of type {expected_type.__name__}, "
+                    f"got {type(field_value).__name__}"
+                )
+            
+            # Validate email format if it's an email field
+            if field == 'email' and field_value:
+                from django.core.validators import validate_email
+                try:
+                    validate_email(field_value)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Invalid email format: {str(e)}")
+        
+        return value
+    
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user_data', None)
+        if user_data:
+            # Update only allowed user fields that are provided
+            for field, value in user_data.items():
+                if field in self.ALLOWED_USER_FIELDS and hasattr(instance.user, field):
+                    setattr(instance.user, field, value)
+            instance.user.save()
+        
+        # Update staff member fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+    
+    def to_representation(self, instance):
+        # Use the standard serializer for output
+        return StaffMemberSerializer(instance).data
 
 
 class StaffAvailabilitySerializer(serializers.ModelSerializer):
