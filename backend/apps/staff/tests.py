@@ -364,6 +364,64 @@ class StaffMemberAPITest(APITestCase):
         self.assertEqual(staff.status, 'inactive')
         self.assertFalse(staff.is_available)
     
+    def test_update_staff_member_invalid_email(self):
+        """Test updating staff member with invalid email"""
+        user = User.objects.create_user(
+            username='john.doe',
+            email='john@example.com',
+            first_name='John',
+            last_name='Doe'
+        )
+        staff = StaffMember.objects.create(
+            user=user,
+            team=self.team,
+            employee_id='EMP001',
+            role='astronomer',
+            hire_date=date(2020, 1, 1)
+        )
+        
+        update_data = {
+            'user_data': {
+                'email': 'invalid-email'  # Invalid email format
+            },
+            'team': self.team.id,
+            'employee_id': 'EMP001',
+            'role': 'astronomer',
+            'status': 'active',
+            'hire_date': '2020-01-01'
+        }
+        response = self.client.put(f'/api/staff/members/{staff.id}/', update_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('user_data', response.data)
+    
+    def test_update_staff_member_invalid_field(self):
+        """Test updating staff member with invalid user field"""
+        user = User.objects.create_user(
+            username='john.doe',
+            email='john@example.com'
+        )
+        staff = StaffMember.objects.create(
+            user=user,
+            team=self.team,
+            employee_id='EMP001',
+            role='astronomer',
+            hire_date=date(2020, 1, 1)
+        )
+        
+        update_data = {
+            'user_data': {
+                'invalid_field': 'value'  # Field not allowed
+            },
+            'team': self.team.id,
+            'employee_id': 'EMP001',
+            'role': 'astronomer',
+            'status': 'active',
+            'hire_date': '2020-01-01'
+        }
+        response = self.client.put(f'/api/staff/members/{staff.id}/', update_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('user_data', response.data)
+    
     def test_delete_staff_member(self):
         """Test deleting a staff member"""
         user = User.objects.create_user(username='john.doe', email='john@example.com')

@@ -79,11 +79,15 @@ class StaffMemberCreateSerializer(serializers.ModelSerializer):
 class StaffMemberUpdateSerializer(serializers.ModelSerializer):
     """Serializer for updating StaffMember with user fields"""
     # Nested dict for updating user fields (all fields optional for updates)
-    # Using DictField without child restriction to support mixed data types
     user_data = serializers.DictField(required=False, allow_null=True)
     
-    # Allowed user fields that can be updated
-    ALLOWED_USER_FIELDS = {'username', 'email', 'first_name', 'last_name'}
+    # Allowed user fields that can be updated with their expected types
+    ALLOWED_USER_FIELDS = {
+        'username': str,
+        'email': str,
+        'first_name': str,
+        'last_name': str,
+    }
     
     class Meta:
         model = StaffMember
@@ -93,6 +97,36 @@ class StaffMemberUpdateSerializer(serializers.ModelSerializer):
             'min_rest_days', 'hire_date', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def validate_user_data(self, value):
+        """Validate user_data fields"""
+        if not value:
+            return value
+        
+        for field, field_value in value.items():
+            if field not in self.ALLOWED_USER_FIELDS:
+                raise serializers.ValidationError(
+                    f"'{field}' is not an allowed user field. "
+                    f"Allowed fields: {', '.join(self.ALLOWED_USER_FIELDS.keys())}"
+                )
+            
+            # Validate data type
+            expected_type = self.ALLOWED_USER_FIELDS[field]
+            if not isinstance(field_value, expected_type):
+                raise serializers.ValidationError(
+                    f"'{field}' must be of type {expected_type.__name__}, "
+                    f"got {type(field_value).__name__}"
+                )
+            
+            # Validate email format if it's an email field
+            if field == 'email' and field_value:
+                from django.core.validators import validate_email
+                try:
+                    validate_email(field_value)
+                except Exception as e:
+                    raise serializers.ValidationError(f"Invalid email format: {str(e)}")
+        
+        return value
     
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user_data', None)
